@@ -53,7 +53,7 @@ const wsdl = `
     </binding>
     <service name="TareaService">
         <port name="TareaPort" binding="tns:TareaBinding">
-            <soap:address location="http://localhost:4000/soap"/> 
+            <soap:address location="${PUBLIC_HOST}${path}"/> 
         </port>
     </service>
 </definitions>
@@ -131,11 +131,23 @@ const service = {
  * @param {string} path - Ruta donde se montará el servicio (ej: /soap)
  */
 exports.init = (app, path) => {
-  soap.listen(app, path, service, wsdl, function () {
-    console.log(
-      `📡 Servidor SOAP escuchando en http://localhost:${
-        process.env.PORT || 4000
-      }${path}?wsdl`
-    );
-  });
+  // CRÍTICO: Definir el host público para que el WSDL lo sirva correctamente.
+  // Usamos la nueva variable de entorno que configuraremos en Render.
+  // Si no está definida (local), usamos el fallback a localhost:4000.
+  const PUBLIC_HOST =
+    process.env.BACKEND_API_URL ||
+    `http://localhost:${process.env.PORT || 4000}`;
+
+  soap.listen(
+    app,
+    path,
+    service,
+    wsdl,
+    function () {
+      console.log(
+        `📡 Servidor SOAP escuchando en ${PUBLIC_HOST}${path}?wsdl` // Usamos PUBLIC_HOST en el log
+      );
+    },
+    PUBLIC_HOST
+  ); // <-- ¡ESTE es el argumento CLAVE! Pasa la URL pública aquí.
 };

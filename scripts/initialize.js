@@ -34,6 +34,9 @@ INSERT INTO tareas (descripcion, completada) VALUES
 async function initializeDatabase() {
   const client = new Client({
     connectionString: connectionString,
+    ssl: {
+        rejectUnauthorized: false 
+    }
   });
 
   try {

@@ -1,27 +1,39 @@
+// backend/config/db.js
+
 const { Pool } = require('pg');
 
-// ----------------------------------------------------------------------
-// Configuración Automática del Pool
-// ----------------------------------------------------------------------
-// La clase Pool de 'pg' está diseñada para leer automáticamente las
-// variables de entorno estándar (PGUSER, PGHOST, PGDATABASE, PGPASSWORD, PGPORT)
-// que definimos en nuestro archivo .env. Esto hace que la configuración
-// sea limpia y lista para ser usada tanto localmente como en Render.
-// ----------------------------------------------------------------------
+// La PG_URL se lee de la variable de entorno que establecimos en Render
+const connectionString = process.env.PG_URL || process.env.DATABASE_URL;
 
-const pool = new Pool();
+if (!connectionString) {
+    console.error('❌ ERROR: No se encontró la URL de conexión a PostgreSQL. El servidor no puede iniciar.');
+    // Es CRÍTICO salir aquí si no hay URL, ya que el servidor no puede funcionar.
+    process.exit(1); 
+}
+
+// ----------------------------------------------------------------------
+// Configuración del Pool con la URL y SSL
+// ----------------------------------------------------------------------
+const pool = new Pool({
+    // 1. Usa la cadena de conexión completa de Render
+    connectionString: connectionString, 
+    
+    // 2. CONFIGURACIÓN CRÍTICA PARA RENDER (FORZAR SSL)
+    ssl: {
+        // Render usa un certificado autofirmado que Node rechazaría por defecto.
+        // Esto permite la conexión segura.
+        rejectUnauthorized: false
+    }
+});
 
 // Opcional: Una verificación de conexión al inicio
-// Es una buena práctica para asegurar que la aplicación puede interactuar
-// con la BD antes de aceptar peticiones.
-
 pool.query('SELECT NOW() AS hora_conexion', (err, res) => {
     if (err) {
-        console.error('Error fatal al conectar con PostgreSQL:', err.message);
-        // Podrías salir del proceso aquí si la conexión a la BD es vital:
-        // process.exit(1); 
+        // Esta línea es la que genera el "Error fatal al conectar con PostgreSQL" en el log de Render
+        console.error('❌ Error fatal al conectar con PostgreSQL:', err.message);
+        process.exit(1); // Detenemos el proceso para evitar que Express se inicie sin BD
     } else {
-        console.log(`Conexión a PostgreSQL exitosa. Hora del servidor BD: ${res.rows[0].hora_conexion}`);
+        console.log(`✅ Conexión a PostgreSQL exitosa. Hora del servidor BD: ${res.rows[0].hora_conexion}`);
     }
 });
 

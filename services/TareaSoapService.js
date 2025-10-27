@@ -1,11 +1,17 @@
 const soap = require("soap");
 const db = require("../config/db");
 
+// ====================================================================
+// 1. CORRECCIÓN CRÍTICA: Definir PUBLIC_HOST y PUBLIC_PATH al inicio
+// ====================================================================
+
+// Usamos la URL de Render si está disponible, sino localhost para desarrollo
+const PUBLIC_HOST =
+  process.env.BACKEND_API_URL || `http://localhost:${process.env.PORT || 4000}`;
+const SOAP_PATH = "/soap"; // Definimos el path de forma consistente
+
 // El WSDL (Web Services Description Language) define la interfaz del servicio.
 // Aquí se define un WSDL minimalista que describe la función del informe.
-
-// NOTA: En un caso real, el WSDL sería un archivo XML separado. Para simplificar,
-// lo definimos como una cadena aquí, pero la librería 'soap' puede generarlo.
 const wsdl = `
 <definitions name="TareaService" 
     targetNamespace="http://www.tudominio.com/tareas"
@@ -53,7 +59,7 @@ const wsdl = `
     </binding>
     <service name="TareaService">
         <port name="TareaPort" binding="tns:TareaBinding">
-            <soap:address location="${PUBLIC_HOST}${path}"/> 
+            <soap:address location="${PUBLIC_HOST}${SOAP_PATH}"/> 
         </port>
     </service>
 </definitions>
@@ -61,10 +67,12 @@ const wsdl = `
 
 // Implementación de la Lógica del Servicio SOAP
 const service = {
+  // ... (el resto de la implementación de service es la misma y está correcta)
   TareaService: {
     TareaPort: {
-      // La función que será invocada por el cliente SOAP
       ObtenerReporteTareas: async (args, callback) => {
+        // ... (lógica interna del servicio SOAP)
+
         try {
           // 1. Obtener todas las tareas
           const result = await db.query("SELECT completada FROM tareas");
@@ -98,18 +106,12 @@ const service = {
 </reporte>`.trim();
 
           // Devolver la respuesta SOAP con el XML dentro
-          // IMPORTANTE: Se devuelve como un objeto con la misma clave que el WSDL:
           return { xmlReporte: xmlReporte };
         } catch (error) {
           console.error(
             "❌ ERROR CRÍTICO en servicio SOAP (BD/Lógica):",
             error.message
           );
-
-          // Cuando hay un error de lógica, la librería SOAP necesita una respuesta.
-          // Generamos un error SOAP formal que el cliente pueda manejar.
-          // El error 500 está siendo generado internamente por Express/SOAP,
-          // lo reescribimos para asegurar que el frontend reciba un error coherente.
 
           throw {
             Fault: {
@@ -131,12 +133,8 @@ const service = {
  * @param {string} path - Ruta donde se montará el servicio (ej: /soap)
  */
 exports.init = (app, path) => {
-  // CRÍTICO: Definir el host público para que el WSDL lo sirva correctamente.
-  // Usamos la nueva variable de entorno que configuraremos en Render.
-  // Si no está definida (local), usamos el fallback a localhost:4000.
-  const PUBLIC_HOST =
-    process.env.BACKEND_API_URL ||
-    `http://localhost:${process.env.PORT || 4000}`;
+  // Nota: Eliminamos la re-declaración de PUBLIC_HOST de aquí,
+  // ya que ahora se define globalmente arriba.
 
   soap.listen(
     app,
@@ -148,6 +146,6 @@ exports.init = (app, path) => {
         `📡 Servidor SOAP escuchando en ${PUBLIC_HOST}${path}?wsdl` // Usamos PUBLIC_HOST en el log
       );
     },
-    PUBLIC_HOST
-  ); // <-- ¡ESTE es el argumento CLAVE! Pasa la URL pública aquí.
+    PUBLIC_HOST // El argumento que fuerza a soap a usar esta URL en el WSDL servido.
+  );
 };
